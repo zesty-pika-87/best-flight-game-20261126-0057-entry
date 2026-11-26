@@ -32,14 +32,16 @@ export function autopilot(state, careless) {
   // Hold the 3-degree slope; near the ground, raise the nose for the flare.
   // The flare is late and two-stage — a gentle round-out below 5 m, then a
   // soft hold below 2 m — because flaring high floats the aircraft past the
-  // runway instead of landing on it.
+  // runway instead of landing on it. The command is a pitch *rate* (the
+  // model eases the nose toward trim when the command is zero), so this is a
+  // gentle proportional nudge, not a jump.
   let wantVspeed = -state.speed * Math.tan((3 * Math.PI) / 180);
   const slopeError = idealAlt(state.dist) - state.alt;
   wantVspeed += clamp(slopeError * 0.12, -2.5, 2.5);
   if (!careless && state.alt < 5) wantVspeed = state.alt < 2 ? -0.6 : -1.2;
   if (careless) wantVspeed = -4.5;
   const pitchWant = Math.asin(clamp(wantVspeed / Math.max(20, state.speed), -1, 1)) * 180 / Math.PI;
-  const pitch = clamp(pitchWant / FLIGHT.maxPitch, -1, 1);
+  const pitch = clamp((pitchWant - state.pitch) * 0.5, -1, 1);
   return { throttle, pitch, bank };
 }
 

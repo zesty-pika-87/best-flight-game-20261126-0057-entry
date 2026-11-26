@@ -58,6 +58,15 @@ function makeSortie(index) {
 function runShot(name) {
   const sortie = makeSortie(stripIndex);
   const scene = stageShot(name, sortie.flight, (f, c, dt) => stepFlight(f, c, dt));
+  // The debug handle the playtest drives: state and the staged screen.
+  window.__game = {
+    get flight() {
+      return sortie.flight;
+    },
+    get screen() {
+      return scene.screen;
+    },
+  };
   let painted = 0;
   function paint() {
     sortie.renderer.draw(sortie.flight, scene.screen, scene.best);

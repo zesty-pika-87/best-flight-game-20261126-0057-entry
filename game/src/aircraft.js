@@ -158,12 +158,19 @@ export function stepFlight(state, control, dt) {
   state.speed += (targetSpeed - state.speed) * 0.5 * dt;
   if (state.fuel <= 0) state.speed = Math.max(FLIGHT.minSpeed, state.speed - 2.5 * dt);
 
-  // Bank turns the nose; pitch sets the climb. Both ease toward the command.
+  // Bank turns the nose; pitch is a rate while a key is held, and eases back
+  // to the -3 degree glide trim when the pilot lets go — so a keyboard, which
+  // can only say up or down, flies as smoothly as a stick.
   const bankTarget = control.bank * FLIGHT.maxBank;
   state.bank += clamp(bankTarget - state.bank, -70 * dt, 70 * dt);
   state.heading += state.bank * FLIGHT.turnRate * dt;
-  const pitchTarget = control.pitch * FLIGHT.maxPitch;
-  state.pitch += clamp(pitchTarget - state.pitch, -14 * dt, 14 * dt);
+  if (control.pitch !== 0) {
+    state.pitch += control.pitch * 6 * dt;
+  } else {
+    const trim = -3 - state.pitch;
+    state.pitch += clamp(trim, -2.5 * dt, 2.5 * dt);
+  }
+  state.pitch = clamp(state.pitch, -FLIGHT.maxPitch, FLIGHT.maxPitch);
 
   // Lift: below stall speed the wing quits and the sink grows fast.
   state.stalled = state.speed < FLIGHT.stallSpeed;

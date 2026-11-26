@@ -28,7 +28,7 @@ export const FLIGHT = {
 /** Where the approach starts, and how the sortie is scored. */
 export const SORTIE = {
   startDist: 1800,
-  startAlt: 120,
+  startAlt: 94,
   startLat: 45,
   startHeading: 10,
   startSpeed: 42,

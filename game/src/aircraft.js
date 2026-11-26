@@ -125,8 +125,8 @@ function touchDown(state) {
     state.smoke.push({
       x: state.lat + (i % 2 === 0 ? -6 : 6) + (Math.sin(i * 7.3) * 4),
       y: 0.5,
-      z: state.dist - i * 0.8,
-      r: 2 + (i % 5),
+      z: -state.dist - i * 0.8,
+      r: 0.8 + (i % 5) * 0.3,
       life: 1,
     });
   }
@@ -171,7 +171,9 @@ export function stepFlight(state, control, dt) {
   state.vspeed = state.speed * Math.sin((state.pitch * Math.PI) / 180) - stallSink;
 
   // Flare: close to the ground, a raised nose is what softens the touchdown.
-  state.flared = state.alt < 15 && state.dist < 220;
+  // The call comes late — below 8 m — because flaring high makes the
+  // aircraft float past the runway instead of landing on it.
+  state.flared = state.alt < 8 && state.dist < 200;
 
   state.alt += state.vspeed * dt;
   state.dist -= state.speed * Math.cos((state.pitch * Math.PI) / 180) * dt;

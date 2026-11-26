@@ -16,13 +16,17 @@ export function createCamera(state) {
   const sinH = Math.sin(heading);
   const cosH = Math.cos(heading);
   // Camera trails the aircraft: mostly its lateral offset, a little above it,
-  // and thirty metres behind it, so the aircraft stays in frame.
+  // and forty-five metres behind it, so the aircraft stays in frame and the
+  // runway ahead opens up below the horizon.
   const camX = state.lat * 0.82;
-  const camY = state.alt + 7;
-  const camZ = -state.dist - 30;
+  const camY = state.alt + 14;
+  const camZ = -state.dist - 45;
 
   return {
     horizonY: HORIZON_Y,
+    /** The camera's own z, so the runway can start ahead of it when the */
+    /** aircraft has already passed the threshold. */
+    z: camZ,
     /** Project a world point; returns null when it is behind the camera. */
     project(x, y, z) {
       const dx = x - camX;

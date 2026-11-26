@@ -12,7 +12,7 @@ import { idealAlt } from './glidepath.js';
 import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
 
 const START_SECONDS = 8;
-const PLAY_DIST = 650;
+const PLAY_DIST = 500;
 const LIMIT_SECONDS = 120;
 
 function clamp(value, min, max) {
@@ -21,20 +21,25 @@ function clamp(value, min, max) {
 
 /** The autopilot: speed by throttle, centreline by bank, slope by pitch. */
 export function autopilot(state, careless) {
-  const speedError = FLIGHT.approachSpeed - state.speed;
+  // Slow for short final: less speed means a shorter landing roll.
+  const speedTarget = state.dist < 300 ? 33 : FLIGHT.approachSpeed;
+  const speedError = speedTarget - state.speed;
   const throttle = careless ? -1 : clamp(speedError * 0.12, -1, 1);
   // Aim the nose a little into the wind and back toward the centreline.
   const cross = state.wind.crossAt(state.time);
   const headingWant = clamp(-state.lat * 0.14 - cross * 0.6, -12, 12);
   const bank = careless ? 0 : clamp((headingWant - state.heading) * 0.25, -1, 1);
   // Hold the 3-degree slope; near the ground, raise the nose for the flare.
+  // The flare is late and two-stage — a gentle round-out below 5 m, then a
+  // soft hold below 2 m — because flaring high floats the aircraft past the
+  // runway instead of landing on it.
   let wantVspeed = -state.speed * Math.tan((3 * Math.PI) / 180);
   const slopeError = idealAlt(state.dist) - state.alt;
-  wantVspeed += clamp(slopeError * 0.06, -1.6, 1.6);
-  if (!careless && state.alt < 14 && state.dist < 240) wantVspeed = -0.45;
+  wantVspeed += clamp(slopeError * 0.12, -2.5, 2.5);
+  if (!careless && state.alt < 5) wantVspeed = state.alt < 2 ? -0.6 : -1.2;
   if (careless) wantVspeed = -4.5;
   const pitchWant = Math.asin(clamp(wantVspeed / Math.max(20, state.speed), -1, 1)) * 180 / Math.PI;
-  const pitch = clamp((pitchWant - state.pitch) * 0.5, -1, 1);
+  const pitch = clamp(pitchWant / FLIGHT.maxPitch, -1, 1);
   return { throttle, pitch, bank };
 }
 

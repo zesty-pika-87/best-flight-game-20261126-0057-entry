@@ -143,7 +143,7 @@ export function createRenderer(canvas, terrain) {
       ctx.fill();
       ctx.fillStyle = PALETTE.island;
       ctx.beginPath();
-      ctx.ellipse(p.x, p.y - r * 0.04, r * 0.78, r * 0.24, 0, 0, Math.PI * 2);
+      ctx.ellipse(p.x, p.y - r * 0.01, r * 0.93, r * 0.27, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#1d5c33';
       for (let k = 0; k < isle.palms; k += 1) {
@@ -174,15 +174,36 @@ export function createRenderer(canvas, terrain) {
 
   function drawRunway(state, camera) {
     const L = state.strip.runwayLength;
+    const HALF = 14;
+    // The near edge starts ahead of the camera: once the aircraft is past
+    // the threshold the strip still fills the frame ahead of it.
+    const nearZ = Math.max(0, camera.z + 8);
     const corners = [
-      camera.project(-11, 0, 0),
-      camera.project(11, 0, 0),
-      camera.project(11, 0, L),
-      camera.project(-11, 0, L),
+      camera.project(-HALF, 0, nearZ),
+      camera.project(HALF, 0, nearZ),
+      camera.project(HALF, 0, L),
+      camera.project(-HALF, 0, L),
     ];
     if (corners.some((c) => c === null)) return;
+    // Grass clearing first, so the strip reads as a place, not a grey line.
+    const grass = [
+      camera.project(-48, 0, nearZ),
+      camera.project(48, 0, nearZ),
+      camera.project(48, 0, L),
+      camera.project(-48, 0, L),
+    ];
+    if (grass.every((c) => c !== null)) {
+      ctx.fillStyle = state.strip.night ? '#1d3320' : '#4a7d3f';
+      ctx.beginPath();
+      ctx.moveTo(grass[0].x, grass[0].y);
+      ctx.lineTo(grass[1].x, grass[1].y);
+      ctx.lineTo(grass[2].x, grass[2].y);
+      ctx.lineTo(grass[3].x, grass[3].y);
+      ctx.closePath();
+      ctx.fill();
+    }
     // Asphalt trapezoid.
-    ctx.fillStyle = state.strip.night ? '#23262c' : PALETTE.runway;
+    ctx.fillStyle = state.strip.night ? '#2e3238' : '#565b63';
     ctx.beginPath();
     ctx.moveTo(corners[0].x, corners[0].y);
     ctx.lineTo(corners[1].x, corners[1].y);
@@ -217,10 +238,21 @@ export function createRenderer(canvas, terrain) {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(a.x, Math.min(a.y, b.y), Math.abs(b.x - a.x), 4);
     }
-    // Runway number near the threshold.
+    // Runway number near the threshold, sized to the distance like paint.
     const num = camera.project(0, 0.1, 55);
     if (num && num.scale > 0.12) {
-      text(ctx, state.strip.runwayNumber, num.x, num.y + 30 * num.scale, Math.max(14, 90 * num.scale), '#ffffff', 'center', 800);
+      const size = Math.max(12, Math.min(56, 26 * num.scale));
+      text(ctx, state.strip.runwayNumber, num.x, num.y + size * 0.55, size, '#ffffff', 'center', 800);
+    }
+    // Approach lights: a row of bright dots leading the eye from the dark
+    // water straight into the threshold, the way a real ALS does.
+    ctx.fillStyle = '#ffffff';
+    for (let d = -240; d <= 0; d += 40) {
+      const p = camera.project(0, 0.6, d);
+      if (!p) continue;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(2, 2.6 * p.scale), 0, Math.PI * 2);
+      ctx.fill();
     }
     // PAPI lights: white when above the slope, red when below, 2+2 on slope.
     const band = state.alt - idealAlt(state.dist);
@@ -258,11 +290,12 @@ export function createRenderer(canvas, terrain) {
       ctx.closePath();
       ctx.fill();
     }
-    // Pulsing aim diamond over the touchdown zone.
+    // Pulsing aim diamond over the touchdown zone, further down the runway
+    // than the number so the two never crowd each other.
     const pulse = 0.7 + 0.3 * Math.sin(state.time * 4);
-    const aim = camera.project(0, 1.5, 95);
+    const aim = camera.project(0, 1.5, 180);
     if (aim) {
-      const s = Math.max(6, 14 * aim.scale * pulse);
+      const s = Math.max(6, Math.min(30, 14 * aim.scale * pulse));
       ctx.strokeStyle = '#ffd23d';
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -290,9 +323,11 @@ export function createRenderer(canvas, terrain) {
 
   function drawCorridor(state, camera) {
     const gates = corridorGates();
-    // Far gates first so near ones paint over them.
+    // Far gates first so near ones paint over them. Gates at or behind the
+    // aircraft are skipped: one metre from the lens they would fill the sky.
     for (let i = 0; i < gates.length; i += 1) {
       const g = gates[i];
+      if (g.dist > state.dist - 80) continue;
       const z = -g.dist;
       const tl = camera.project(-g.halfWidth, g.alt + g.halfHeight, z);
       const tr = camera.project(g.halfWidth, g.alt + g.halfHeight, z);
@@ -300,7 +335,7 @@ export function createRenderer(canvas, terrain) {
       const bl = camera.project(-g.halfWidth, g.alt - g.halfHeight, z);
       if (!tl || !tr || !br || !bl) continue;
       const depth = Math.max(0.12, 1 - g.dist / 1800);
-      ctx.fillStyle = `rgba(55, 224, 160, ${0.06 * depth + 0.02})`;
+      ctx.fillStyle = `rgba(55, 224, 160, ${0.04 * depth + 0.01})`;
       ctx.beginPath();
       ctx.moveTo(tl.x, tl.y);
       ctx.lineTo(tr.x, tr.y);
@@ -329,12 +364,12 @@ export function createRenderer(canvas, terrain) {
         ctx.stroke();
       }
     }
-    // Dotted centreline beam down the ideal slope.
+    // Dotted centreline beam down the ideal slope, ahead of the aircraft only.
     ctx.fillStyle = 'rgba(255, 210, 61, 0.85)';
-    for (let d = 100; d <= 1500; d += 100) {
+    for (let d = 100; d <= 1500 && d < state.dist - 120; d += 100) {
       const p = camera.project(0, idealAlt(d), -d);
       if (!p) continue;
-      const r = Math.max(1.5, 2.4 * p.scale);
+      const r = Math.max(1.5, Math.min(5, 2.4 * p.scale));
       ctx.beginPath();
       ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
@@ -359,9 +394,10 @@ export function createRenderer(canvas, terrain) {
   /** The Cendrawasih STOL bush plane, seen from behind and above, banked. */
   function drawPlane(state) {
     const cx = FIELD.width / 2;
-    const cy = 452 - state.pitch * 4;
+    const cy = 500 - state.pitch * 4;
     ctx.save();
     ctx.translate(cx, cy);
+    ctx.scale(0.8, 0.8);
     ctx.rotate((-state.bank * Math.PI) / 180);
     // High wing, wide and straight, red tips.
     ctx.fillStyle = PALETTE.planeWhite;
@@ -444,8 +480,8 @@ export function createRenderer(canvas, terrain) {
       const s = state.smoke[i];
       const p = camera.project(s.x, s.y, s.z);
       if (!p) continue;
-      const r = s.r * p.scale * (2 - s.life);
-      ctx.fillStyle = `rgba(220, 220, 215, ${0.55 * s.life})`;
+      const r = Math.min(42, s.r * p.scale * (2 - s.life));
+      ctx.fillStyle = `rgba(220, 220, 215, ${0.4 * s.life})`;
       ctx.beginPath();
       ctx.arc(p.x, p.y - r * 0.3, Math.max(2, r), 0, Math.PI * 2);
       ctx.fill();
@@ -453,7 +489,7 @@ export function createRenderer(canvas, terrain) {
   }
 
   function drawTitle(state, best) {
-    panel(ctx, 120, 44, 1040, 632, 0.88);
+    panel(ctx, 120, 44, 1040, 632, 0.96);
     text(ctx, 'LANDASAN NUSANTARA', FIELD.width / 2, 122, 58, PALETTE.text, 'center', 800);
     text(ctx, 'STOL Island Landings  ·  Cendrawasih STOL  ·  ikuti koridor hijau ke landasan', FIELD.width / 2, 158, 22, PALETTE.muted, 'center', 600);
     text(ctx, 'PILIH STRIP — tekan 1 sampai 5, lalu Spasi untuk terbang', 160, 196, 22, PALETTE.good, 'left', 700);
@@ -470,8 +506,8 @@ export function createRenderer(canvas, terrain) {
       }
       text(ctx, `${i + 1}`, 168, y + 32, 30, selected ? PALETTE.good : PALETTE.muted, 'left', 800);
       text(ctx, s.name, 210, y + 32, 28, PALETTE.text, 'left', 700);
-      text(ctx, `${s.island} · ${s.mission}`, 470, y + 32, 22, PALETTE.muted, 'left', 600);
-      text(ctx, `${s.runwayLength} m · angin ${s.crosswind} m/s`, 940, y + 32, 22, PALETTE.text, 'right', 600);
+      text(ctx, `${s.island} · ${s.mission}`, 480, y + 32, 20, PALETTE.muted, 'left', 600);
+      text(ctx, `${s.runwayLength} m · angin ${s.crosswind} m/s`, 1120, y + 32, 20, PALETTE.text, 'right', 600);
     }
     text(ctx, CONTROLS[0] + '   ·   ' + CONTROLS[1], FIELD.width / 2, 556, 21, PALETTE.muted, 'center', 600);
     text(ctx, CONTROLS[2] + '   ·   ' + CONTROLS[3], FIELD.width / 2, 586, 21, PALETTE.muted, 'center', 600);
@@ -516,11 +552,17 @@ export function createRenderer(canvas, terrain) {
       drawTitle(state, best);
       return;
     }
-    drawPrimaryHud(state);
-    drawFuelWind(state);
-    drawGlideStrip(state);
-    drawThrottle(state);
-    drawFlash(state);
+    // The debrief stands alone: no HUD behind the panel, so no number is ever
+    // half-hidden by a panel edge.
+    if (screen === SCREEN_OVER) {
+      drawOver(state, best);
+      return;
+    }
+    drawPrimaryHud(ctx, state);
+    drawFuelWind(ctx, state);
+    drawGlideStrip(ctx, state);
+    drawThrottle(ctx, state);
+    drawFlash(ctx, state);
     // The touchdown frame: the verdict banner over the live scene, with the
     // smoke still curling behind the wheels.
     if ((state.phase === 'landed' || state.phase === 'crashed') && screen === SCREEN_PLAY) {

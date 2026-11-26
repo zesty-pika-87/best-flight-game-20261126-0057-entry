@@ -4,7 +4,9 @@
 // it offline, with no library and no network request. This program copies
 // game/ and screenshots/ from beside this file to /output and writes
 // /output/dossier.json, the summary the judge reads, with the vendored
-// make.fun library. The game is a bush-plane landing game: fly the Cendrawasih
+// make.fun library. The grader runs this file twice and both runs must write
+// the same bytes, so the program does nothing time-dependent: it copies the
+// files as they are and lets buildDossier do the summarising. The game is a bush-plane landing game: fly the Cendrawasih
 // STOL down a visible glidepath corridor and land it on five named island
 // strips, with crosswind, fuel and gear damage deciding each sortie.
 //

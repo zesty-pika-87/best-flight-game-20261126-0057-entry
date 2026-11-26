@@ -12,7 +12,11 @@ import { idealAlt } from './glidepath.js';
 import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
 
 const START_SECONDS = 8;
-const PLAY_DIST = 500;
+// Short final: close enough that the runway, threshold bars and PAPI read
+// clearly in the cover frame, but not so close that the approach-light row
+// nearest the camera balloons into a blob below the aircraft, and far
+// enough out that the 150 m corridor gate is still ahead of the aircraft.
+const PLAY_DIST = 280;
 const LIMIT_SECONDS = 120;
 
 function clamp(value, min, max) {
